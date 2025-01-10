@@ -5,22 +5,14 @@ from PIL import Image
 from io import BytesIO
 import base64
 import numpy as np
-from prices import get_team_prices
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import base64
-from transformers import pipeline
 from datetime import timedelta
 import random
 
 st.set_page_config(layout="wide")
-
-@st.cache_resource
-def load_summarizer():
-    return pipeline("summarization", model="t5-small")  # Use a lightweight model
-
-summarizer = load_summarizer()
 
 def image_to_base64(img):
     if img:
@@ -39,10 +31,10 @@ tab1, tab2, tab3 = st.tabs(["Market", "Tokens", "About"])
 with tab1:
     col = st.columns((2.5, 5, 2.5), gap='medium')
 
-team_df = pd.read_csv('/Users/rogerwhite/Desktop/Stakeholder_data/teams.csv')
-price_df = pd.read_csv('/Users/rogerwhite/Desktop/Stakeholder_data/prices.csv')
-yield_df = pd.read_csv('/Users/rogerwhite/Desktop/Stakeholder_data/yield.csv')
-leader_df = pd.read_csv('/Users/rogerwhite/Desktop/Stakeholder_data/leaderboard.csv')
+team_df = pd.read_csv('./Stakeholder_data/teams.csv')
+price_df = pd.read_csv('./Stakeholder_data/prices.csv')
+yield_df = pd.read_csv('./Stakeholder_data/yield.csv')
+leader_df = pd.read_csv('./Stakeholder_data/leaderboard.csv')
 
 # Paths to local logos (update paths to match your actual files)
 logo_paths = [f"./images/logo_{i}.png" for i in range(0, len(team_df))]
@@ -297,8 +289,7 @@ with col[1]:
         with st.spinner("Generating summary..."):
             # Generate a summary
             summary_input = f"Provide a summary of the {team} NCAA football team, focusing on their achievements, history, and recent performance."
-            summary = summarizer(summary_input, max_length=13, min_length=6, do_sample=False)
-            container.write(f"""**Summary for {team}:** {summary[0]['summary_text']} The goal of this summary is to provide a weekly update on the team's recent performance
+            container.write(f"""**Summary for {team}:** The goal of this summary is to provide a weekly update on the team's recent performance
                 aswell as the team's outlook going forward. An example would be providing a short summary of the recent game result, highlighting player performances, 
                 team metrics, etc., followed by expectations for next week's game and how that result may affect the team's standing.""")
     
