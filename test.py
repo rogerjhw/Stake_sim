@@ -12,7 +12,10 @@ import base64
 from datetime import timedelta
 import random
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide",
+                   page_title="Stakeholder Demo",  # Name of the site
+                    page_icon="./Stakeholder_logo_sm.jpg"  # Favicon image for the site
+)
 
 def image_to_base64(img):
     if img:
