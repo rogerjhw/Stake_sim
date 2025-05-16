@@ -1,140 +1,227 @@
-
 import streamlit as st
 import pandas as pd
+import random
 
 # Constants
 INITIAL_GLOBAL_RESERVE = 13400
-TOKENS_PER_DOLLAR = 1 / 134
 RESERVE_INCREMENT = 134
 MAX_OWNERSHIP_RATIO = 0.3
+NUM_TEAMS = 134
+INITIAL_SUPPLY_PER_TEAM = 100
+INITIAL_CASH = 10000
+CHURN_PROBABILITY = 0.10
 
-# Initialize session state
-if "users" not in st.session_state:
-    NUM_TEAMS = 134
-    NUM_USERS = 5
-    INITIAL_CASH = 10000
+st.set_page_config(layout="wide")
+st.title("Stakeholder Token Market Simulator")
 
-    st.session_state.teams = [f"Team_{i}" for i in range(NUM_TEAMS)]
-    st.session_state.users = [f"User_{i}" for i in range(NUM_USERS)]
-    st.session_state.token_supply = pd.Series(100.0, index=st.session_state.teams)
-    st.session_state.global_reserve = INITIAL_GLOBAL_RESERVE
-    st.session_state.reserve_buffer = 0.0
-    st.session_state.user_cash = pd.Series(INITIAL_CASH, index=st.session_state.users)
-    st.session_state.user_tokens = pd.DataFrame(0, index=st.session_state.users, columns=st.session_state.teams)
-    st.session_state.transactions = []
-    st.session_state.last_filled_price = {team: 1.0 for team in st.session_state.teams}
-    st.session_state.pending_burns = {team: 0 for team in st.session_state.teams}
+sim_days = st.sidebar.slider("Simulation Days", 10, 90, 30)
+users_per_day = st.sidebar.slider("Users per Day", 1, 10, 5)
+transaction_prob = st.sidebar.slider("Transaction Probability", 0.1, 1.0, 0.5)
 
-# AMM price function based on demand ratio
-def update_prices():
-    prices = {}
-    for team in st.session_state.teams:
-        supply = st.session_state.token_supply[team]
-        demand = st.session_state.user_tokens[team].sum()
-        demand_ratio = demand / (supply + 1e-6)
-        price = 1.0 * (1 + 0.5 * (demand_ratio - 0.5))
-        prices[team] = price
-    raw_prices = pd.Series(prices)
-    market_cap = (raw_prices * st.session_state.token_supply).sum()
-    if market_cap > 0:
-        raw_prices *= st.session_state.global_reserve / market_cap
-    return raw_prices
+if st.button("Run Simulation"):
+    progress = st.progress(0)
 
-st.title("Stakeholder Token Trading Simulator")
-st.session_state.token_prices = update_prices()
+    teams = [f"Team_{i}" for i in range(NUM_TEAMS)]
+    influential = random.sample(range(NUM_TEAMS), 25)
+    hot = random.sample(influential, 10)
+    warm = [i for i in influential if i not in hot]
 
-# UI Controls
-st.sidebar.header("Trade")
-selected_user = st.sidebar.selectbox("User", st.session_state.users)
-action = st.sidebar.radio("Action", ["Buy", "Sell"])
-selected_team = st.sidebar.selectbox("Team", st.session_state.teams)
-price = st.session_state.token_prices[selected_team]
-st.sidebar.write(f"Price: ${price:.2f}")
-quantity = st.sidebar.number_input("Quantity", min_value=1, step=1, value=1)
+    weights = [1.0] * NUM_TEAMS
+    for i in warm:
+        weights[i] = 3.0
+    for i in hot:
+        weights[i] = 6.0
+    weights = [w / sum(weights) for w in weights]
 
-# Execute trade
-if st.sidebar.button("Execute Trade"):
-    total_price = price * quantity
+    base_prices = {}
+    for i in range(NUM_TEAMS):
+        if i in hot:
+            base_prices[f"Team_{i}"] = 6.0
+        elif i in warm:
+            base_prices[f"Team_{i}"] = 2.0
 
-    if action == "Buy":
-        available_supply = st.session_state.token_supply[selected_team] - st.session_state.user_tokens[selected_team].sum()
-        current_holdings = st.session_state.user_tokens.loc[selected_user, selected_team]
-        max_allowed = MAX_OWNERSHIP_RATIO * st.session_state.token_supply[selected_team]
+    fixed_price_sum = sum(base_prices.values())
+    remaining_teams = NUM_TEAMS - len(base_prices)
+    remaining_total_value = NUM_TEAMS * 1.0 - fixed_price_sum
+    remaining_price = remaining_total_value / remaining_teams
 
-        if st.session_state.user_cash[selected_user] < total_price:
-            st.error("Insufficient funds.")
-        elif available_supply < quantity:
-            st.error("Not enough supply.")
-        elif current_holdings + quantity > max_allowed:
-            st.error("Cannot exceed 30% ownership.")
-        else:
-            st.session_state.user_cash[selected_user] -= total_price
-            st.session_state.user_tokens.loc[selected_user, selected_team] += quantity
-            st.session_state.reserve_buffer += total_price
-            st.session_state.last_filled_price[selected_team] = price
-            for _ in range(quantity):
-                st.session_state.transactions.append((selected_user, "buy", selected_team, price))
-            st.success(f"{selected_user} bought {quantity} {selected_team} tokens at ${price:.2f}")
+    for i in range(NUM_TEAMS):
+        team = f"Team_{i}"
+        if team not in base_prices:
+            base_prices[team] = remaining_price
 
-    elif action == "Sell":
-        if st.session_state.user_tokens.loc[selected_user, selected_team] < quantity:
-            st.error("Insufficient tokens.")
-        else:
-            sell_price = st.session_state.last_filled_price[selected_team]
-            payout = sell_price * quantity
-            st.session_state.user_cash[selected_user] += payout
-            st.session_state.user_tokens.loc[selected_user, selected_team] -= quantity
-            st.session_state.reserve_buffer -= payout
-            for _ in range(quantity):
-                st.session_state.transactions.append((selected_user, "sell", selected_team, sell_price))
-            st.success(f"{selected_user} sold {quantity} {selected_team} tokens at ${sell_price:.2f}")
+    users = []
+    user_cash = {}
+    user_tokens = pd.DataFrame(0, index=[], columns=teams)
+    token_supply = pd.Series(INITIAL_SUPPLY_PER_TEAM, index=teams)
+    global_reserve = INITIAL_GLOBAL_RESERVE
+    reserve_buffer = 0.0
+    total_fees_collected = 0.0
+    last_filled_price = base_prices.copy()
+    pending_burns = {team: 0 for team in teams}
+    price_history = []
+    supply_history = []
+    reserve_history = []
+    tx_log = []
+    failed_tx_log = []
+    lp_contributions = []
 
-    # Reserve-based mint/burn
-    if abs(st.session_state.reserve_buffer) >= RESERVE_INCREMENT:
-        steps = int(abs(st.session_state.reserve_buffer) // RESERVE_INCREMENT)
-        direction = 1 if st.session_state.reserve_buffer > 0 else -1
-        st.session_state.reserve_buffer -= direction * steps * RESERVE_INCREMENT
-        st.session_state.global_reserve += direction * steps * RESERVE_INCREMENT
-        for team in st.session_state.teams:
-            if direction > 0:
-                burn_offset = min(st.session_state.pending_burns[team], steps)
-                st.session_state.pending_burns[team] -= burn_offset
-                st.session_state.token_supply[team] += (steps - burn_offset)
-            else:
-                available = st.session_state.token_supply[team] - st.session_state.user_tokens[team].sum()
-                if available > 0:
-                    burnable = min(steps, available)
-                    st.session_state.token_supply[team] -= burnable
-                    st.session_state.pending_burns[team] += (steps - burnable)
+    def update_prices():
+        prices = {}
+        for team in teams:
+            demand = user_tokens[team].sum()
+            supply = token_supply[team]
+            base = base_prices[team]
+            ratio = demand / (supply + 1e-6)
+            price = base * (1 + 0.5 * (ratio - 0.5))
+            prices[team] = price
+        raw = pd.Series(prices)
+        cap = (raw * token_supply).sum()
+        if cap > 0:
+            raw *= global_reserve / cap
+        return raw
+
+    for day in range(sim_days):
+        progress.progress((day + 1) / sim_days)
+
+        if day % 7 == 0:
+            trending_teams = random.sample(teams, 5)
+
+        if (day + 1) % 30 == 0:
+            lp_amount = 13400
+            proportion = lp_amount / (global_reserve + 1e-6)
+            lp_contributions.append((day+1, lp_amount, proportion, global_reserve))
+            reserve_buffer += lp_amount
+
+        for _ in range(users_per_day):
+            u = f"user_{len(users)}"
+            users.append(u)
+            user_cash[u] = INITIAL_CASH
+            user_tokens.loc[u] = 0
+
+        prices = update_prices()
+
+        for user in users:
+            churn = random.random() < (CHURN_PROBABILITY / sim_days)
+            if churn:
+                for team in teams:
+                    qty = user_tokens.loc[user, team]
+                    if qty > 0:
+                        payout = last_filled_price[team] * qty
+                        user_cash[user] += payout
+                        reserve_buffer -= payout
+                        user_tokens.loc[user, team] = 0
+                        tx_log.append((day+1, user, "churn_sell", team, qty, 0.0))
+                continue
+
+            if random.random() < transaction_prob:
+                owned_teams = [team for team in teams if user_tokens.loc[user, team] > 0]
+                possible_actions = ["buy"]
+                if owned_teams:
+                    possible_actions.append("sell")
+                action = random.choice(possible_actions)
+
+                current_weights = weights[:]
+                for idx, team in enumerate(teams):
+                    if team in trending_teams:
+                        current_weights[idx] *= 8.0
+                team_id = random.choices(range(NUM_TEAMS), weights=current_weights)[0]
+                team = f"Team_{team_id}"
+                price = prices[team]
+                quantity = max(1, int(round(10 / price))) if action == "buy" else random.choice([1, 2, 5])
+                total = price * quantity
+
+                if action == "buy":
+                    available = token_supply[team] - user_tokens[team].sum()
+                    holding = user_tokens.loc[user, team]
+                    max_allowed = MAX_OWNERSHIP_RATIO * token_supply[team]
+                    if user_cash[user] >= total and available >= quantity and holding + quantity <= max_allowed:
+                        fee = total * 0.0175
+                        net = total - fee
+                        user_cash[user] -= total
+                        reserve_buffer += net
+                        total_fees_collected += fee
+                        user_tokens.loc[user, team] += quantity
+                        last_filled_price[team] = price
+                        tx_log.append((day+1, user, "buy", team, quantity, fee))
+                    else:
+                        failed_tx_log.append((day+1, user, "buy", team, quantity, "denied: constraints"))
+                elif action == "sell":
+                    if user_tokens.loc[user, team] >= quantity:
+                        payout = last_filled_price[team] * quantity
+                        user_cash[user] += payout
+                        reserve_buffer -= payout
+                        user_tokens.loc[user, team] -= quantity
+                        tx_log.append((day+1, user, "sell", team, quantity, 0.0))
+                    else:
+                        failed_tx_log.append((day+1, user, "sell", team, quantity, "denied: insufficient holdings"))
+
+        if abs(reserve_buffer) >= RESERVE_INCREMENT:
+            steps = int(abs(reserve_buffer) // RESERVE_INCREMENT)
+            direction = 1 if reserve_buffer > 0 else -1
+            reserve_buffer -= direction * steps * RESERVE_INCREMENT
+            global_reserve += direction * steps * RESERVE_INCREMENT
+            for team in teams:
+                if direction > 0:
+                    offset = min(pending_burns[team], steps)
+                    pending_burns[team] -= offset
+                    token_supply[team] += (steps - offset)
                 else:
-                    st.session_state.pending_burns[team] += steps
+                    unowned = token_supply[team] - user_tokens[team].sum()
+                    if unowned > 0:
+                        burnable = min(steps, unowned)
+                        token_supply[team] -= burnable
+                        pending_burns[team] += (steps - burnable)
+                    else:
+                        pending_burns[team] += steps
 
-    st.session_state.token_prices = update_prices()
+        price_history.append(update_prices())
+        supply_history.append(token_supply.copy())
+        reserve_history.append(global_reserve)
 
-# UI Display
-st.subheader("User Cash")
-st.dataframe(st.session_state.user_cash)
+    st.subheader("Transaction Log")
+    tx_df = pd.DataFrame(tx_log, columns=["Day", "User", "Action", "Team", "Quantity", "Fee"])
+    st.dataframe(tx_df)
 
-st.subheader("User Holdings")
-st.dataframe(st.session_state.user_tokens)
+    st.subheader("Failed Transactions")
+    failed_df = pd.DataFrame(failed_tx_log, columns=["Day", "User", "Action", "Team", "Quantity", "Reason"])
+    st.dataframe(failed_df)
 
-st.subheader("Token Supply")
-st.dataframe(st.session_state.token_supply)
+    st.subheader("Total Fees Collected")
+    st.metric("Fees Collected (USD)", f"${total_fees_collected:,.2f}")
 
-st.subheader("Pending Burns")
-st.dataframe(pd.Series(st.session_state.pending_burns))
+    st.subheader("LP Contributions")
+    lp_df = pd.DataFrame(lp_contributions, columns=["Day", "Amount", "Proportional Pool Share at Entry", "Reserve at Entry"])
+    st.dataframe(lp_df)
 
-st.subheader("Prices")
-st.dataframe(st.session_state.token_prices)
+    st.subheader("LP Profit Summary")
+    lp_profit = []
+    if lp_contributions:
+        for day, amount, proportion, entry_reserve in lp_contributions:
+            exit_value = global_reserve * proportion
+            profit = exit_value - amount
+            lp_profit.append((day, amount, exit_value, profit))
+        st.dataframe(pd.DataFrame(lp_profit, columns=["Day", "Deposit", "Value Now", "Profit"]))
 
-st.subheader("Transactions")
-log_df = pd.DataFrame(st.session_state.transactions, columns=["User", "Action", "Team", "Price"])
-st.dataframe(log_df)
+    st.subheader("User Behavior Summary")
+    if not tx_df.empty:
+        user_volume = tx_df[tx_df["Action"] == "buy"].groupby("User")["Quantity"].sum()
+        total_volume = user_volume.sum()
+        st.metric("Total Buy Volume Over Period", f"{total_volume:.0f} tokens")
 
-st.sidebar.markdown(f"**Reserve:** ${st.session_state.global_reserve:.2f}")
-st.sidebar.markdown(f"**Buffer:** ${st.session_state.reserve_buffer:.2f}")
-st.sidebar.markdown(f"**Market Cap:** ${(st.session_state.token_prices * st.session_state.token_supply).sum():.2f}")
+    price_df = pd.DataFrame(price_history)
+    supply_df = pd.DataFrame(supply_history)
+    reserve_df = pd.DataFrame(reserve_history, columns=["Global Reserve"])
 
-if st.button("Reset"):
-    st.session_state.clear()
-    st.experimental_rerun()
+    st.subheader("Select Teams to Visualize")
+    default_selection = [f"Team_{i}" for i in hot + warm[:15]]
+    selected_teams = st.multiselect("Choose teams", price_df.columns.tolist(), default=default_selection)
+
+    st.subheader("Token Price Trends")
+    st.line_chart(price_df[selected_teams])
+
+    st.subheader("Token Supply Over Time")
+    st.line_chart(supply_df[selected_teams])
+
+    st.subheader("Global Reserve Over Time")
+    st.line_chart(reserve_df)
