@@ -26,7 +26,8 @@ logo_img = Image.open(logo_path)
 
 #st.image(logo_img, use_column_width = False, width = 150)
 
-tab1, tab2, tab3 = st.tabs(["Market", "Tokens", "About"])
+#tab1, tab2, tab3 = st.tabs(["Market", "Tokens", "About"])
+tab1, tab2 = st.tabs(["Market", "Tokens"])
 
 with tab1:
     col = st.columns((2.5, 5, 2.5), gap='medium')
