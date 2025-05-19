@@ -334,58 +334,58 @@ with col[1]:
         )
 
 
-with tab3:
-    col1, col2, col3 = st.columns([3, 4, 3])
+# with tab3:
+#     col1, col2, col3 = st.columns([3, 4, 3])
     
-    with col2:
-        st.markdown('##### ')
-        st.markdown('### About Stakeholder')
-        st.write("""Stakeholder is a platform that hosts a skill based competition where users can buy and
-                    sell tokens associated with college football teams (with the goal of expanding to
-                    professional sports). Users indirectly compete against each other in exercising predictive
-                    skill to determine which teams will perform better than others.""")
+#     with col2:
+#         st.markdown('##### ')
+#         st.markdown('### About Stakeholder')
+#         st.write("""Stakeholder is a platform that hosts a skill based competition where users can buy and
+#                     sell tokens associated with college football teams (with the goal of expanding to
+#                     professional sports). Users indirectly compete against each other in exercising predictive
+#                     skill to determine which teams will perform better than others.""")
         
-        expand = st.expander("The launch: College Football Team Tokens", icon="🚀")
-        expand.markdown("""The platform will initially auction 100 team tokens per 134 FBS teams (13,400 total
-                    tokens) at \$1.00 a piece. These tokens will be backed by an initial reserve pool of \$13,400
-                    worth of USDC supplied by Stakeholder. Tokens that don’t receive bids above \$1.00 will
-                    remain locked until we opt to lower their starting bid at a later date.""")
+#         expand = st.expander("The launch: College Football Team Tokens", icon="🚀")
+#         expand.markdown("""The platform will initially auction 100 team tokens per 134 FBS teams (13,400 total
+#                     tokens) at \$1.00 a piece. These tokens will be backed by an initial reserve pool of \$13,400
+#                     worth of USDC supplied by Stakeholder. Tokens that don’t receive bids above \$1.00 will
+#                     remain locked until we opt to lower their starting bid at a later date.""")
         
-        expand = st.expander("Reserve pooling", icon="💰")
-        expand.markdown("""The reserve pool is the pool of money that is dedicated to earning yield and paying token holders.""")
+#         expand = st.expander("Reserve pooling", icon="💰")
+#         expand.markdown("""The reserve pool is the pool of money that is dedicated to earning yield and paying token holders.""")
 
-        expand = st.expander("Payouts", icon="🏆")
-        expand.markdown("""Each token represents a stake in the reserve pool. When the reserve pool earns interest,
-                    that interest is given back to token holders. 
-                    Tokens associated with teams that perform better receive a larger stake of the reserve.
-                    Specifically, the payout formula takes into account a team’s position in the AP top 25
-                    ranking. The more votes a team receives from the AP committee, the larger share of the
-                    payout pool they earn.""")
+#         expand = st.expander("Payouts", icon="🏆")
+#         expand.markdown("""Each token represents a stake in the reserve pool. When the reserve pool earns interest,
+#                     that interest is given back to token holders. 
+#                     Tokens associated with teams that perform better receive a larger stake of the reserve.
+#                     Specifically, the payout formula takes into account a team’s position in the AP top 25
+#                     ranking. The more votes a team receives from the AP committee, the larger share of the
+#                     payout pool they earn.""")
 
-        st.markdown('##### ')
-        st.markdown('### How it works')
-        st.write("""Example, if the \#1 ranked team Georgia  received 1,550 points and there were 20,160
-                    points total, they would receive 1,550/20,160 = 7.7\% of the monthly payout.
-                    If the monthly payout from the reserve pool was \$1,000 total, then \$77 would be
-                    distributed to Georgia token holders.""")
+#         st.markdown('##### ')
+#         st.markdown('### How it works')
+#         st.write("""Example, if the \#1 ranked team Georgia  received 1,550 points and there were 20,160
+#                     points total, they would receive 1,550/20,160 = 7.7\% of the monthly payout.
+#                     If the monthly payout from the reserve pool was \$1,000 total, then \$77 would be
+#                     distributed to Georgia token holders.""")
         
-        st.markdown('##### ')
-        st.markdown('### FAQs')
-        expand = st.expander("How often are payouts made?", icon=":material/info:")
-        expand.markdown("""Payouts will be monthly. In order to receive payouts for any given month and token, the
-                    owner of the token must have purchased the token on or before the ex-payout date. For
-                    example, in 2024 the first AP ranking was released on *August 12, 2024*. In order to be
-                    eligible for the August payout, one must have bought and held a token before *July 12,
-                    2024*. The next payout would then take place on September 12, 2024 and be determined
-                    by that week's rankings.""")
+#         st.markdown('##### ')
+#         st.markdown('### FAQs')
+#         expand = st.expander("How often are payouts made?", icon=":material/info:")
+#         expand.markdown("""Payouts will be monthly. In order to receive payouts for any given month and token, the
+#                     owner of the token must have purchased the token on or before the ex-payout date. For
+#                     example, in 2024 the first AP ranking was released on *August 12, 2024*. In order to be
+#                     eligible for the August payout, one must have bought and held a token before *July 12,
+#                     2024*. The next payout would then take place on September 12, 2024 and be determined
+#                     by that week's rankings.""")
         
-        expand = st.expander("What determines prices?", icon=":material/info:")
-        expand.markdown("""Prices will be dictated purely by supply and demand. The payouts are designed to be a
-                    guiding hand for price action, but ultimately, it will be up to the market to determine each
-                    token’s price.""")
+#         expand = st.expander("What determines prices?", icon=":material/info:")
+#         expand.markdown("""Prices will be dictated purely by supply and demand. The payouts are designed to be a
+#                     guiding hand for price action, but ultimately, it will be up to the market to determine each
+#                     token’s price.""")
         
-        expand = st.expander("Do the tokens expire?", icon=":material/info:")
-        expand.markdown("""Nope. The tokens are designed to exist in perpetuity.""")
+#         expand = st.expander("Do the tokens expire?", icon=":material/info:")
+#         expand.markdown("""Nope. The tokens are designed to exist in perpetuity.""")
 
         
                             
