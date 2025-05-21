@@ -1,1 +1,98 @@
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
+def show_simulation_summary(results):
+    st.subheader("Transaction Log")
+    st.dataframe(pd.DataFrame(results["tx_log"], columns=["Day", "User", "Action", "Team", "Quantity", "Fee"]))
+
+    st.subheader("Failed Transactions")
+    st.dataframe(pd.DataFrame(results["failed_tx_log"], columns=["Day", "User", "Action", "Team", "Quantity", "Reason"]))
+
+    st.subheader("Total Fees Collected")
+    st.metric("Fees Collected (USD)", f"${results['total_fees']:,.2f}")
+
+    st.subheader("LP Contributions")
+    st.dataframe(pd.DataFrame(results["lp_contributions"], columns=["Day", "Amount", "Proportional Pool Share at Entry", "Reserve at Entry"]))
+
+    st.subheader("End of Simulation Market Overview")
+    final_prices = results["price_df"].iloc[-1]
+    final_supply = results["supply_df"].iloc[-1]
+    final_holdings = results["user_tokens"].sum()
+    available_supply = final_supply - final_holdings
+    market_df = pd.DataFrame({"Final Price": final_prices, "Available Supply": available_supply})
+    st.dataframe(market_df.sort_values("Final Price", ascending=False))
+
+def show_price_chart(results):
+    st.subheader("Visualize Token Prices Over Time")
+    token_to_plot = st.selectbox("Choose a team to plot", results["price_df"].columns.tolist())
+    st.line_chart(results["price_df"][token_to_plot])
+
+def show_available_supply_chart(results):
+    st.subheader("Visualize Available Token Supply Over Time")
+    token = st.selectbox("Choose a team to plot available supply", results["supply_df"].columns.tolist())
+    available_over_time = results["supply_df"][token] - results["user_holdings_df"][token]
+    st.line_chart(available_over_time)
+
+def visualize_price_with_volume(results):
+    st.subheader("📊 Token Price vs Trade Volume")
+
+    price_df = results["price_df"]
+    tx_df = pd.DataFrame(results["tx_log"], columns=["Day", "User", "Action", "Team", "Quantity", "Fee"])
+
+    selected_team = st.selectbox("Choose a team to visualize", price_df.columns.tolist())
+
+    # Filter transactions for selected team
+    team_tx = tx_df[tx_df["Team"] == selected_team]
+
+    # Group volume by day and action
+    daily_volume = team_tx.groupby(["Day", "Action"])["Quantity"].sum().unstack(fill_value=0)
+
+    # Align with price data
+    daily_price = price_df[selected_team]
+
+    fig = go.Figure()
+
+    # Line chart for price
+    fig.add_trace(go.Scatter(
+        x=daily_price.index,
+        y=daily_price.values,
+        mode="lines",
+        name="Price",
+        yaxis="y1"
+    ))
+
+    # Stacked bar for buys and sells
+    if "buy" in daily_volume:
+        fig.add_trace(go.Bar(
+            x=daily_volume.index,
+            y=daily_volume["buy"],
+            name="Buys",
+            yaxis="y2",
+            marker_color="green",
+            opacity=0.6
+        ))
+
+    if "sell" in daily_volume:
+        fig.add_trace(go.Bar(
+            x=daily_volume.index,
+            y=daily_volume["sell"],
+            name="Sells",
+            yaxis="y2",
+            marker_color="red",
+            opacity=0.6
+        ))
+
+    fig.update_layout(
+        title=f"{selected_team} Price and Trade Volume Over Time",
+        xaxis=dict(title="Day"),
+        yaxis=dict(title="Token Price", side="left"),
+        yaxis2=dict(title="Trade Volume", overlaying="y", side="right", showgrid=False),
+        barmode="stack"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+
 
