@@ -8,27 +8,43 @@ RESERVE_INCREMENT = 134
 MAX_OWNERSHIP_RATIO = 0.3
 NUM_TEAMS = 134
 INITIAL_SUPPLY_PER_TEAM = 100
-INITIAL_CASH = 10000
+INITIAL_CASH = 100
 CHURN_PROBABILITY = 0.10
 MIN_PRICE = 0.01
 
 def run_simulation(sim_days, users_per_day, transaction_prob):
     teams = [f"Team_{i}" for i in range(NUM_TEAMS)]
 
-    # Assign tiered pricing
     hot_ids = random.sample(range(NUM_TEAMS), 10)
-    warm_pool = [i for i in range(NUM_TEAMS) if i not in hot_ids]
-    warm_ids = random.sample(warm_pool, 15)
+    remaining = [i for i in range(NUM_TEAMS) if i not in hot_ids]
+    warm_ids = random.sample(remaining, 30)
+    remaining = [i for i in remaining if i not in warm_ids]
+    mid_ids = random.sample(remaining, 30)
+    cold_ids = [i for i in range(NUM_TEAMS) if i not in hot_ids + warm_ids + mid_ids]
+
+    hot_price = 6.0
+    warm_price = 1.0
+    mid_price = 0.3
+
+    fixed_cap = (
+        10 * hot_price * INITIAL_SUPPLY_PER_TEAM +
+        30 * warm_price * INITIAL_SUPPLY_PER_TEAM +
+        30 * mid_price * INITIAL_SUPPLY_PER_TEAM
+    )
+    remaining_cap = INITIAL_GLOBAL_RESERVE - fixed_cap
+    cold_price = remaining_cap / (len(cold_ids) * INITIAL_SUPPLY_PER_TEAM)
 
     base_prices = {}
     for i in range(NUM_TEAMS):
         team = f"Team_{i}"
         if i in hot_ids:
-            base_prices[team] = 6.0
+            base_prices[team] = hot_price
         elif i in warm_ids:
-            base_prices[team] = 2.0
+            base_prices[team] = warm_price
+        elif i in mid_ids:
+            base_prices[team] = mid_price
         else:
-            base_prices[team] = 0.40
+            base_prices[team] = cold_price
     prices = pd.Series(base_prices)
 
     user_tokens = pd.DataFrame(0, index=[], columns=teams)
@@ -48,51 +64,78 @@ def run_simulation(sim_days, users_per_day, transaction_prob):
     def rotate_hot_warm():
         nonlocal hot_ids, warm_ids
         cold_ids = [i for i in range(NUM_TEAMS) if i not in hot_ids and i not in warm_ids]
-
         if cold_ids:
             promoted_to_warm = random.choice(cold_ids)
             warm_ids.append(promoted_to_warm)
-
         if warm_ids:
             promoted_to_hot = random.choice(warm_ids)
             hot_ids.append(promoted_to_hot)
             warm_ids.remove(promoted_to_hot)
-
         if hot_ids:
             demoted_to_warm = random.choice(hot_ids)
             warm_ids.append(demoted_to_warm)
             hot_ids.remove(demoted_to_warm)
-
         if warm_ids:
             demoted_to_cold = random.choice(warm_ids)
             warm_ids.remove(demoted_to_cold)
+
+    def price_halver(price):
+        if price >= 0.01:
+            return price
+        return 0.01 * (price / 0.01) ** 0.5
 
     def apply_zero_sum_price_change(prices, target_team, direction, quantity):
         circulating = user_tokens[target_team].sum()
         available = max(token_supply[target_team] - circulating, 1e-6)
         scarcity_multiplier = 1 + (circulating / available)
         base_delta = 0.01 * quantity
-        delta_price = base_delta * scarcity_multiplier if direction == "up" else -base_delta * scarcity_multiplier
+        raw_delta_price = base_delta * scarcity_multiplier if direction == "up" else -base_delta * scarcity_multiplier
 
         old_price = prices[target_team]
+        proposed_price = old_price + raw_delta_price
+        softened = False
+        compensating_effect = 0.0
+
+        if direction == "down" and proposed_price < 0.01:
+            softened = True
+            softened_delta = max(0.4 * raw_delta_price, -old_price + 0.01)  # softened, not below min
+            compensating_effect = (raw_delta_price - softened_delta) * token_supply[target_team]
+            delta_price = softened_delta
+        else:
+            delta_price = raw_delta_price
+
         new_price = max(old_price + delta_price, MIN_PRICE)
         delta_mc = (new_price - old_price) * token_supply[target_team]
         prices[target_team] = new_price
 
-        if abs(delta_mc) < 1e-6:
+        if abs(delta_mc) < 1e-6 and compensating_effect == 0:
             return prices
 
         others = [t for t in teams if t != target_team]
-        total_supply_others = token_supply[others].sum()
+        eligible_tokens = []
+        total_supply_others = 0
+
         for t in others:
-            share = token_supply[t] / total_supply_others if total_supply_others > 0 else 1 / len(others)
+            if prices[t] > 0.011:  # Token is not near price floor
+                eligible_tokens.append(t)
+                total_supply_others += token_supply[t]
+
+        for t in eligible_tokens:
+            share = token_supply[t] / total_supply_others if total_supply_others > 0 else 1 / len(eligible_tokens)
             adjustment = -delta_mc * share / token_supply[t]
             prices[t] = max(prices[t] + adjustment, MIN_PRICE)
 
+        if compensating_effect > 0 and eligible_tokens:
+            # Distribute unapplied adjustment across eligible tokens
+            for t in eligible_tokens:
+                share = token_supply[t] / total_supply_others
+                prices[t] += -compensating_effect * share / token_supply[t]
+                prices[t] = max(prices[t], MIN_PRICE)
+
         return prices
 
-    progress = st.progress(0)
 
+    progress = st.progress(0)
     for day in range(sim_days):
         progress.progress((day + 1) / sim_days)
 
@@ -137,8 +180,12 @@ def run_simulation(sim_days, users_per_day, transaction_prob):
                     tx_log.append((day + 1, user, "sell", team, quantity, 0.0))
                     prices = apply_zero_sum_price_change(prices, team, "down", quantity)
                 else:
-                    weights = [3 if f"Team_{i}" in [f"Team_{j}" for j in warm_ids]
-                               else 6 if f"Team_{i}" in [f"Team_{j}" for j in hot_ids] else 1 for i in range(NUM_TEAMS)]
+                    weights = [
+                        6 if i in hot_ids else
+                        3 if i in warm_ids else
+                        2 if i in mid_ids else
+                        1 for i in range(NUM_TEAMS)
+                    ]
                     team_id = random.choices(range(NUM_TEAMS), weights=weights)[0]
                     team = f"Team_{team_id}"
                     price = max(prices[team], MIN_PRICE)
