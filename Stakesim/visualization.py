@@ -93,6 +93,29 @@ def visualize_price_with_volume(results):
 
     st.plotly_chart(fig, use_container_width=True)
 
+def show_all_prices_chart(results):
+    st.subheader("📈 All Token Prices Over Time")
 
+    price_df = results["price_df"]
 
+    fig = go.Figure()
+    for team in price_df.columns:
+        fig.add_trace(go.Scatter(
+            x=price_df.index,
+            y=price_df[team],
+            mode="lines",
+            name=team,
+            line=dict(width=1),
+            opacity=0.6
+        ))
+
+    fig.update_layout(
+        title="All Token Prices",
+        xaxis_title="Day",
+        yaxis_title="Price (USD)",
+        showlegend=False,
+        height=700
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
