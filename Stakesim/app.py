@@ -1,6 +1,9 @@
 import streamlit as st
+if "results" not in st.session_state:
+    st.session_state["results"] = None
+
 from simulation import run_simulation
-from visualization import show_simulation_summary, show_price_chart, show_available_supply_chart, visualize_price_with_volume
+from visualization import show_simulation_summary, show_price_chart, show_available_supply_chart, visualize_price_with_volume, show_all_prices_chart
 from trade_interface import trade_interface
 
 
@@ -18,10 +21,11 @@ if st.button("Run Simulation"):
     st.session_state["has_run"] = True
     st.session_state["results"] = run_simulation(sim_days, users_per_day, transaction_prob)
 
-if st.session_state["has_run"]:
+if st.session_state["results"] is not None:
     tab1, tab2, tab3 = st.tabs(["Simulation Summary", "Token Price Chart", "User Interface"])
     with tab1:
         show_simulation_summary(st.session_state["results"])
+        show_all_prices_chart(st.session_state["results"])
     with tab2:
         show_price_chart(st.session_state["results"])
         show_available_supply_chart(st.session_state["results"])
