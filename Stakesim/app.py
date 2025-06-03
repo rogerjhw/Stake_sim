@@ -6,7 +6,7 @@ from simulation import run_simulation
 from visualization import show_simulation_summary, show_price_chart, show_available_supply_chart, visualize_price_with_volume, show_all_prices_chart, show_mcap
 from trade_interface import trade_interface
 
-logo = 'stakesim_logo.png'
+logo = '/mount/src/stakeholder/Stakesim/stakesim_logo.png'
 
 st.set_page_config(layout="wide")
 st.image(logo)
