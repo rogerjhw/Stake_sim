@@ -3,23 +3,25 @@ import pandas as pd
 import plotly.graph_objects as go
 
 def show_simulation_summary(results):
-    st.markdown("**Transaction Log**")
-    st.dataframe(pd.DataFrame(results["tx_log"], columns=["Day", "User", "Action", "Team", "Quantity", "Fee", "Nominal Value"]))
-
-    st.markdown("**Failed Transactions**")
-    st.dataframe(pd.DataFrame(results["failed_tx_log"], columns=["Day", "User", "Action", "Team", "Quantity", "Reason"]))
-
-
-    st.markdown("**LP Contributions**")
-    st.dataframe(pd.DataFrame(results["lp_contributions"], columns=["Day", "Amount", "Proportional Pool Share at Entry", "Reserve at Entry"]))
-
-    st.markdown("**End of Simulation Market Overview**")
-    final_prices = results["price_df"].iloc[-1]
-    final_supply = results["supply_df"].iloc[-1]
-    final_holdings = results["user_tokens"].sum()
-    available_supply = final_supply - final_holdings
-    market_df = pd.DataFrame({"Final Price": final_prices, "Available Supply": available_supply})
-    st.dataframe(market_df.sort_values("Final Price", ascending=False))
+    col1, _ = st.columns([1, 1])  # 1/3 width chart
+    with col1:
+        st.markdown("**Transaction Log**")
+        st.dataframe(pd.DataFrame(results["tx_log"], columns=["Day", "User", "Action", "Team", "Quantity", "Fee", "Nominal Value"]))
+    
+        st.markdown("**Failed Transactions**")
+        st.dataframe(pd.DataFrame(results["failed_tx_log"], columns=["Day", "User", "Action", "Team", "Quantity", "Reason"]))
+    
+    
+        st.markdown("**LP Contributions**")
+        st.dataframe(pd.DataFrame(results["lp_contributions"], columns=["Day", "Amount", "Proportional Pool Share at Entry", "Reserve at Entry"]))
+    
+        st.markdown("**End of Simulation Market Overview**")
+        final_prices = results["price_df"].iloc[-1]
+        final_supply = results["supply_df"].iloc[-1]
+        final_holdings = results["user_tokens"].sum()
+        available_supply = final_supply - final_holdings
+        market_df = pd.DataFrame({"Final Price": final_prices, "Available Supply": available_supply})
+        st.dataframe(market_df.sort_values("Final Price", ascending=False))
 
 def show_price_chart(results, token):
     col1, _ = st.columns([1, 1])  # 1/3 width chart
