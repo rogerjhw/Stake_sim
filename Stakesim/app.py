@@ -16,7 +16,7 @@ if "has_run" not in st.session_state:
 
 
 with st.sidebar:
-    st.logo(logo)
+    #st.logo(logo)
     st.markdown('**Sim params**')
     st.markdown('Set the rules of the sandbox')
     container = st.container(border = True)
