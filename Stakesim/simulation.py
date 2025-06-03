@@ -164,7 +164,7 @@ def run_simulation(sim_days, users_per_day, transaction_prob):
                         user_cash[user] += payout
                         reserve_buffer -= payout
                         user_tokens.loc[user, team] = 0
-                        tx_log.append((day + 1, user, "churn_sell", team, qty, 0.0))
+                        tx_log.append((day + 1, user, "churn_sell", team, qty, 0.0, payout))
                 continue
 
             if random.random() < transaction_prob:
@@ -177,7 +177,7 @@ def run_simulation(sim_days, users_per_day, transaction_prob):
                     user_cash[user] += payout
                     reserve_buffer -= payout
                     user_tokens.loc[user, team] -= quantity
-                    tx_log.append((day + 1, user, "sell", team, quantity, 0.0))
+                    tx_log.append((day + 1, user, "sell", team, quantity, 0.0, payout))
                     prices = apply_zero_sum_price_change(prices, team, "down", quantity)
                 else:
                     weights = [
@@ -204,7 +204,7 @@ def run_simulation(sim_days, users_per_day, transaction_prob):
                         total_fees_collected += fee
                         user_tokens.loc[user, team] += quantity
                         buy_volume[team] += price * quantity
-                        tx_log.append((day + 1, user, "buy", team, quantity, fee))
+                        tx_log.append((day + 1, user, "buy", team, quantity, fee, total))
                         prices = apply_zero_sum_price_change(prices, team, "up", quantity)
                     else:
                         reason = (
@@ -234,11 +234,14 @@ def run_simulation(sim_days, users_per_day, transaction_prob):
         total_market_cap = (prices * token_supply).sum()
         mcap_history.append((day + 1, total_market_cap, global_reserve))
 
-    st.subheader("Market Cap vs Reserve Over Time")
-    mcap_df = pd.DataFrame(mcap_history, columns=["Day", "Market Cap", "Global Reserve"])
-    st.line_chart(mcap_df.set_index("Day"))
-
+    tx_df = pd.DataFrame(tx_log, columns=["Day", "User", "Type", "Team", "Quantity", "Fee", "Nominal Value"])
+    last_30 = tx_df[(tx_df["Day"] > sim_days - 30) & (tx_df["Type"] == "buy")]
+    active_users_30d = last_30["User"].nunique()
+    total_volume_30d = last_30["Nominal Value"].sum()
+    avg_volume_per_user_30d = total_volume_30d / max(active_users_30d, 1)
+    
     return {
+        "mcap_df": pd.DataFrame(mcap_history, columns=["Day", "Market Cap", "Global Reserve"]),
         "price_df": pd.DataFrame(price_history),
         "supply_df": pd.DataFrame(supply_history),
         "reserve_df": pd.DataFrame(reserve_history, columns=["Global Reserve"]),
@@ -251,5 +254,7 @@ def run_simulation(sim_days, users_per_day, transaction_prob):
         "global_reserve": global_reserve,
         "final_prices": prices.copy(),
         "final_supply": token_supply.copy(),
-        "buy_volume": buy_volume
+        "buy_volume": buy_volume,
+        "active_users_30d": active_users_30d,
+        "avg_volume_per_user_30d": avg_volume_per_user_30d
     }
