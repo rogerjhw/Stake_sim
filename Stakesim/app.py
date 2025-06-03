@@ -7,7 +7,9 @@ from visualization import show_simulation_summary, show_price_chart, show_availa
 from trade_interface import trade_interface
 
 logo = 'stakesim_logo.png'
+
 st.set_page_config(layout="wide")
+st.image(logo)
 st.markdown("**Start sim** ⬇️")
 
 
